@@ -27,9 +27,17 @@ custom_font.__index = custom_font
 custom_font.sub_folder = ""
 custom_font.loaded = {}
 
+local function get_base_assets_path(): string
+    local lib = Library or library
+    if lib and lib.directory and lib.folders and lib.folders.assets then
+        return lib.directory .. lib.folders.assets
+    end
+    return "custom_fonts"
+end
+
 function custom_font.set_folder(folder_path: string)
     custom_font.sub_folder = folder_path
-    local full_path = library.directory .. library.folders.assets
+    local full_path = get_base_assets_path()
     
     if folder_path ~= "" then
         full_path = full_path .. "/" .. folder_path
@@ -52,14 +60,15 @@ function custom_font.new(name: string, weight: number, style: string, data: font
     self.style = style
     self.data = data
     
-    local base_assets_folder = library.directory .. library.folders.assets
+    local base_assets_folder = get_base_assets_path()
     local assets_folder = base_assets_folder
     
     if custom_font.sub_folder ~= "" then
         assets_folder = base_assets_folder .. "/" .. custom_font.sub_folder
-        if not isfolder(assets_folder) then
-            makefolder(assets_folder)
-        end
+    end
+    
+    if not isfolder(assets_folder) then
+        makefolder(assets_folder)
     end
     
     local raw_font_path = assets_folder .. "/" .. data.id
@@ -72,7 +81,7 @@ function custom_font.new(name: string, weight: number, style: string, data: font
         if success and response then
             writefile(raw_font_path, response)
         else
-            warn("CustomFont: Failed to download asset for -> " + name)
+            warn("CustomFont: Failed to download asset for -> " .. name)
             return nil
         end
     end
