@@ -17,10 +17,26 @@ export type custom_font_type = typeof(setmetatable({} :: {
 
 local custom_font = {} :: {
     __index: any,
+    sub_folder: string,
+    set_folder: (folder_path: string) -> (),
     new: (name: string, weight: number, style: string, data: font_data_input) -> custom_font_type?,
     get_font_object: (self: custom_font_type) -> Font,
 }
 custom_font.__index = custom_font
+custom_font.sub_folder = ""
+
+function custom_font.set_folder(folder_path: string)
+    custom_font.sub_folder = folder_path
+    local full_path = library.directory .. library.folders.assets
+    
+    if folder_path ~= "" then
+        full_path = full_path .. "/" .. folder_path
+    end
+    
+    if not isfolder(full_path) then
+        makefolder(full_path)
+    end
+end
 
 function custom_font.new(name: string, weight: number, style: string, data: font_data_input): custom_font_type?
     local self = setmetatable({}, custom_font)
@@ -30,7 +46,16 @@ function custom_font.new(name: string, weight: number, style: string, data: font
     self.style = style
     self.data = data
     
-    local assets_folder = library.directory .. library.folders.assets
+    local base_assets_folder = library.directory .. library.folders.assets
+    local assets_folder = base_assets_folder
+    
+    if custom_font.sub_folder ~= "" then
+        assets_folder = base_assets_folder .. "/" .. custom_font.sub_folder
+        if not isfolder(assets_folder) then
+            makefolder(assets_folder)
+        end
+    end
+    
     local raw_font_path = assets_folder .. "/" .. data.id
     
     if not isfile(raw_font_path) then
