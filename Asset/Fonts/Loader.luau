@@ -25,18 +25,14 @@ local custom_font = {} :: {
 }
 
 custom_font.__index = custom_font
-custom_font.folder_path = "custom_fonts"
+custom_font.folder_path = ""
 custom_font.loaded = {}
 
 function custom_font.set_folder(path: string)
     custom_font.folder_path = path
-    if not isfolder(path) then
+    if path ~= "" and not isfolder(path) then
         makefolder(path)
     end
-end
-
-if not isfolder(custom_font.folder_path) then
-    makefolder(custom_font.folder_path)
 end
 
 function custom_font.new(name: string, weight: number, style: string, data: font_data_input): custom_font_type?
@@ -52,11 +48,11 @@ function custom_font.new(name: string, weight: number, style: string, data: font
     self.data = data
     
     local assets_folder = custom_font.folder_path
-    if not isfolder(assets_folder) then
+    if assets_folder ~= "" and not isfolder(assets_folder) then
         makefolder(assets_folder)
     end
     
-    local raw_font_path = assets_folder .. "/" .. data.id
+    local raw_font_path = assets_folder ~= "" and (assets_folder .. "/" .. data.id) or data.id
     
     if not isfile(raw_font_path) then
         local success, response = pcall(function()
@@ -83,7 +79,7 @@ function custom_font.new(name: string, weight: number, style: string, data: font
         }
     }
     
-    local font_path = assets_folder .. "/" .. name .. ".font"
+    local font_path = assets_folder ~= "" and (assets_folder .. "/" .. name .. ".font") or (name .. ".font")
     
     local encode_success, encoded_json = pcall(function()
         return http_service:JSONEncode(font_data)
