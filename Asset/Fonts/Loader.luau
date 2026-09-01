@@ -17,35 +17,26 @@ export type custom_font_type = typeof(setmetatable({} :: {
 
 local custom_font = {} :: {
     __index: any,
-    sub_folder: string,
+    folder_path: string,
     loaded: {[string]: custom_font_type},
-    set_folder: (folder_path: string) -> (),
+    set_folder: (path: string) -> (),
     new: (name: string, weight: number, style: string, data: font_data_input) -> custom_font_type?,
     get_font_object: (self: custom_font_type) -> Font,
 }
+
 custom_font.__index = custom_font
-custom_font.sub_folder = ""
+custom_font.folder_path = "custom_fonts"
 custom_font.loaded = {}
 
-local function get_base_assets_path(): string
-    local lib = Library or library
-    if lib and lib.directory and lib.folders and lib.folders.assets then
-        return lib.directory .. lib.folders.assets
+function custom_font.set_folder(path: string)
+    custom_font.folder_path = path
+    if not isfolder(path) then
+        makefolder(path)
     end
-    return "custom_fonts"
 end
 
-function custom_font.set_folder(folder_path: string)
-    custom_font.sub_folder = folder_path
-    local full_path = get_base_assets_path()
-    
-    if folder_path ~= "" then
-        full_path = full_path .. "/" .. folder_path
-    end
-    
-    if not isfolder(full_path) then
-        makefolder(full_path)
-    end
+if not isfolder(custom_font.folder_path) then
+    makefolder(custom_font.folder_path)
 end
 
 function custom_font.new(name: string, weight: number, style: string, data: font_data_input): custom_font_type?
@@ -60,13 +51,7 @@ function custom_font.new(name: string, weight: number, style: string, data: font
     self.style = style
     self.data = data
     
-    local base_assets_folder = get_base_assets_path()
-    local assets_folder = base_assets_folder
-    
-    if custom_font.sub_folder ~= "" then
-        assets_folder = base_assets_folder .. "/" .. custom_font.sub_folder
-    end
-    
+    local assets_folder = custom_font.folder_path
     if not isfolder(assets_folder) then
         makefolder(assets_folder)
     end
