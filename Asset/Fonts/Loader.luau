@@ -18,12 +18,14 @@ export type custom_font_type = typeof(setmetatable({} :: {
 local custom_font = {} :: {
     __index: any,
     sub_folder: string,
+    loaded: {[string]: custom_font_type},
     set_folder: (folder_path: string) -> (),
     new: (name: string, weight: number, style: string, data: font_data_input) -> custom_font_type?,
     get_font_object: (self: custom_font_type) -> Font,
 }
 custom_font.__index = custom_font
 custom_font.sub_folder = ""
+custom_font.loaded = {}
 
 function custom_font.set_folder(folder_path: string)
     custom_font.sub_folder = folder_path
@@ -39,6 +41,10 @@ function custom_font.set_folder(folder_path: string)
 end
 
 function custom_font.new(name: string, weight: number, style: string, data: font_data_input): custom_font_type?
+    if custom_font.loaded[name] then
+        return custom_font.loaded[name]
+    end
+
     local self = setmetatable({}, custom_font)
     
     self.name = name
@@ -66,7 +72,7 @@ function custom_font.new(name: string, weight: number, style: string, data: font
         if success and response then
             writefile(raw_font_path, response)
         else
-            warn("CustomFont: Failed to download asset for -> " .. name)
+            warn("CustomFont: Failed to download asset for -> " + name)
             return nil
         end
     end
@@ -97,7 +103,9 @@ function custom_font.new(name: string, weight: number, style: string, data: font
     end
     
     self.font_object = Font.new(getcustomasset(font_path))
-    return (self :: any) :: custom_font_type
+    
+    custom_font.loaded[name] = (self :: any) :: custom_font_type
+    return custom_font.loaded[name]
 end
 
 function custom_font:get_font_object(): Font
