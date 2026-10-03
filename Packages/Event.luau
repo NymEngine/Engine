@@ -1,118 +1,126 @@
 --!strict
 
-local connection = {}
-connection.__index = connection
+local WEAK_VALUE_METATABLE = table.freeze({ __mode = "v" })
 
-type connection_impl<T... = ...any> = {
-	connected: boolean,
-	_callback: ((T...) -> ())?,
-	_next: connection<T...>?,
-	_prev: connection<T...>?,
-	_event: { event<T...> }?,
+local Connection = {}
+Connection.__index = Connection
+
+type ConnectionImpl<T... = ...any> = {
+	Connected: boolean,
+	_Callback: ((T...) -> ())?,
+	_Next: Connection<T...>?,
+	_Prev: Connection<T...>?,
+	_Event: { Event<T...> }?,
 }
 
-export type connection<T... = ...any> = typeof(setmetatable({} :: connection_impl<T...>, connection))
+export type Connection<T... = ...any> = typeof(setmetatable({} :: ConnectionImpl<T...>, Connection))
 
-local event = {}
-event.__index = event
+local Event = {}
+Event.__index = Event
 
-type event_impl<T... = ...any> = {
-	_head: connection<T...>?,
+type EventImpl<T... = ...any> = {
+	_Head: Connection<T...>?,
 }
 
-export type event<T... = ...any> = typeof(setmetatable({} :: event_impl<T...>, event))
+export type Event<T... = ...any> = typeof(setmetatable({} :: EventImpl<T...>, Event))
 
-function event.new<T...>(): event<T...>
+function Event.New<T...>(): Event<T...>
 	local self = setmetatable({
-		_head = nil,
-	}, event)
-	return (self :: any) :: event<T...>
+		_Head = nil,
+	}, Event)
+	return (self :: any) :: Event<T...>
 end
+Event.new = Event.New
 
-function event.connect<T...>(self: event<T...>, callback: (T...) -> ()): connection<T...>
+function Event.Connect<T...>(self: Event<T...>, callback: (T...) -> ()): Connection<T...>
 	assert(type(callback) == "function", "callback must be a function")
 
-	local event_ref = setmetatable({ self }, { __mode = "v" })
+	local eventRef = setmetatable({ self }, WEAK_VALUE_METATABLE)
 
-	local conn: connection<T...> = setmetatable({
-		connected = true,
-		_callback = callback,
-		_next = self._head,
-		_prev = nil,
-		_event = event_ref,
-	}, connection) :: any
+	local conn: Connection<T...> = setmetatable({
+		Connected = true,
+		_Callback = callback,
+		_Next = self._Head,
+		_Prev = nil,
+		_Event = eventRef,
+	}, Connection) :: any
 
-	if self._head then
-		self._head._prev = conn
+	if self._Head then
+		self._Head._Prev = conn
 	end
-	self._head = conn
+	self._Head = conn
 
 	return conn
 end
 
-function connection.disconnect<T...>(self: connection<T...>)
-	if not self.connected then
+function Connection.Disconnect<T...>(self: Connection<T...>)
+	if not self.Connected then
 		return
 	end
-	self.connected = false
-	self._callback = nil
+	self.Connected = false
+	self._Callback = nil
 
-	local evt = self._event and self._event[1]
+	local evt = self._Event and self._Event[1]
 
-	if self._prev then
-		self._prev._next = self._next
+	if self._Prev then
+		self._Prev._Next = self._Next
 	elseif evt then
-		evt._head = self._next
+		evt._Head = self._Next
 	end
 
-	if self._next then
-		self._next._prev = self._prev
+	if self._Next then
+		self._Next._Prev = self._Prev
 	end
 
-	self._prev = nil
-	self._next = nil
-	self._event = nil
+	self._Prev = nil
+	-- Note: self._Next is intentionally preserved so active Fire() traversals
+	-- can reach remaining nodes if a connection is disconnected mid-fire.
+	self._Event = nil
 end
 
-function event.once<T...>(self: event<T...>, callback: (T...) -> ()): connection<T...>
+function Event.Once<T...>(self: Event<T...>, callback: (T...) -> ()): Connection<T...>
 	assert(type(callback) == "function", "callback must be a function")
-	local conn: connection<T...>
-	conn = self:connect(function(...: T...)
-		conn:disconnect()
+	local conn: Connection<T...>
+	conn = self:Connect(function(...: T...)
+		conn:Disconnect()
 		callback(...)
 	end)
 	return conn
 end
 
-function event.fire<T...>(self: event<T...>, ...: T...)
-	local item = self._head
+function Event.Fire<T...>(self: Event<T...>, ...: T...)
+	local item = self._Head
 	while item do
-		local next_item = item._next
-		if item.connected and item._callback then
-			task.spawn(item._callback, ...)
+		local nextItem = item._Next
+		if item.Connected and item._Callback then
+			task.spawn(item._Callback, ...)
 		end
-		item = next_item
+		item = nextItem
 	end
 end
 
-function event.wait<T...>(self: event<T...>): T...
+function Event.Wait<T...>(self: Event<T...>): T...
 	local thread = coroutine.running()
-	local conn: connection<T...>
-	conn = self:connect(function(...: T...)
-		conn:disconnect()
-		task.defer(thread, ...)
+	local conn: Connection<T...>
+	conn = self:Connect(function(...: T...)
+		conn:Disconnect()
+		task.spawn(thread, ...)
 	end)
 	return coroutine.yield()
 end
 
-function event.disconnect_all<T...>(self: event<T...>)
-	local item = self._head
+function Event.DisconnectAll<T...>(self: Event<T...>)
+	local item = self._Head
 	while item do
-		local next_item = item._next
-		item:disconnect()
-		item = next_item
+		local nextItem = item._Next
+		item:Disconnect()
+		item = nextItem
 	end
-	self._head = nil
+	self._Head = nil
 end
 
-return event
+function Event.Destroy<T...>(self: Event<T...>)
+	self:DisconnectAll()
+end
+
+return Event
